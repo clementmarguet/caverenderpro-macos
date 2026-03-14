@@ -247,26 +247,31 @@ mkdir -p "$(dirname "$LOG_FILE")"
 exec >> "$LOG_FILE" 2>&1
 echo "--- $(date) ---"
 
-# Trouver Java 25 (JDK inclus dans l’app, ou système)
-if [[ -d "$RESOURCES/jdk/Contents/Home" ]] && [[ -x "$RESOURCES/jdk/Contents/Home/bin/java" ]]; then
+# Trouver Java 25+ uniquement (on ignore les anciennes versions comme Java 14)
+check_java_25() {
+  local jhome="$1"
+  [[ -z "$jhome" ]] && return 1
+  [[ ! -x "$jhome/bin/java" ]] && return 1
+  local ver=$("$jhome/bin/java" -version 2>&1 | grep -oE '"([0-9]+)' | head -1 | tr -d '"')
+  [[ -n "$ver" ]] && [[ "$ver" -ge 25 ]] && return 0
+  return 1
+}
+JAVA_HOME=""
+if check_java_25 "$RESOURCES/jdk/Contents/Home"; then
   JAVA_HOME="$RESOURCES/jdk/Contents/Home"
-elif [[ -x "$RESOURCES/jdk/bin/java" ]]; then
+elif check_java_25 "$RESOURCES/jdk"; then
   JAVA_HOME="$RESOURCES/jdk"
 fi
 if [[ -z "$JAVA_HOME" ]]; then
-  JAVA_HOME=$(/usr/libexec/java_home -v 25 2>/dev/null) || true
+  for j in "$(/usr/libexec/java_home -v 25 2>/dev/null)" "$(/usr/libexec/java_home -v 24 2>/dev/null)" "$(/usr/libexec/java_home 2>/dev/null)"; do
+    [[ -z "$j" ]] && continue
+    if check_java_25 "$j"; then JAVA_HOME="$j"; break; fi
+  done
 fi
 if [[ -z "$JAVA_HOME" ]]; then
-  JAVA_HOME=$(/usr/libexec/java_home -v 24 2>/dev/null) || true
-fi
-if [[ -z "$JAVA_HOME" ]]; then
-  JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null) || true
-fi
-if [[ -z "$JAVA_HOME" ]]; then
-  [[ -d "/opt/homebrew/opt/openjdk" ]] && JAVA_HOME="/opt/homebrew/opt/openjdk"
-  [[ -d "/usr/local/opt/openjdk" ]] && JAVA_HOME="/usr/local/opt/openjdk"
-  [[ -d "/opt/homebrew/opt/openjdk@21" ]] && JAVA_HOME="/opt/homebrew/opt/openjdk@21"
-  [[ -d "/usr/local/opt/openjdk@21" ]] && JAVA_HOME="/usr/local/opt/openjdk@21"
+  for j in /opt/homebrew/opt/openjdk /usr/local/opt/openjdk /opt/homebrew/opt/openjdk@21 /usr/local/opt/openjdk@21; do
+    [[ -d "$j" ]] && check_java_25 "$j" && JAVA_HOME="$j" && break
+  done
 fi
 if [[ -n "$JAVA_HOME" ]]; then
   JAVA_CMD="$JAVA_HOME/bin/java"
@@ -278,10 +283,9 @@ if [[ ! -x "$JAVA_CMD" ]] && ! command -v java &>/dev/null; then
   osascript -e "display alert \"CaveRenderPro\" message \"Java est introuvable. Installez Java 25 (adoptium.net/temurin, version 25) ou relancez le script d'installation.\" as critical"
   exit 1
 fi
-# CaveRenderPro nécessite Java 25 (class file 69)
 JAVA_VER=$("$JAVA_CMD" -version 2>&1 | grep -oE '"([0-9]+)' | head -1 | tr -d '"')
 if [[ -n "$JAVA_VER" ]] && [[ "$JAVA_VER" -lt 25 ]]; then
-  osascript -e "display alert \"CaveRenderPro\" message \"Java 25 ou plus récent est requis (vous avez Java $JAVA_VER). Installez Java 25 puis relancez le script d'installation.\" as critical"
+  osascript -e "display alert \"CaveRenderPro\" message \"Java 25 ou plus récent est requis (trouvé: Java $JAVA_VER). L’app ignore les anciennes versions. Réinstallez avec le script pour inclure Java 25 dans l’app, ou installez Java 25 (adoptium.net).\" as critical"
   exit 1
 fi
 if [[ ! -f "$JAR" ]]; then
