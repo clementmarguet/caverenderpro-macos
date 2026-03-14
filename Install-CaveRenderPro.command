@@ -50,8 +50,7 @@ if [[ $JAVA_OK -eq 0 ]]; then
     JAVA_OK=1
     echo "         Java 25 installé."
   else
-    # Sans Homebrew : téléchargement Temurin via l’API Adoptium
-    # 1) Essai .pkg (sudo) ; 2) Sinon .tar.gz (sans sudo, JDK inclus dans l’app)
+    # Sans Homebrew : on demande à l’utilisateur (install système ou portable)
     ADOPTIUM_ARCH="x64"
     [[ "$ARCH" == "arm64" ]] && ADOPTIUM_ARCH="aarch64"
     ADOPTIUM_API="https://api.adoptium.net/v3/assets/feature_releases/25/ga?os=mac&architecture=$ADOPTIUM_ARCH&image_type=jdk"
@@ -73,53 +72,68 @@ try:
 except Exception: pass
 " 2>/dev/null)
 
-    # Essai 1 : installation .pkg (demande mot de passe admin)
-    if [[ $JAVA_OK -eq 0 ]] && [[ -n "$JAVA_PKG_URL" ]]; then
-      echo "         Téléchargement de Java 25 (Temurin)…"
-      JAVA_PKG_FILE="$INSTALL_DIR/temurin25.pkg"
-      if curl -L -o "$JAVA_PKG_FILE" "$JAVA_PKG_URL" && [[ -f "$JAVA_PKG_FILE" ]]; then
-        echo "         Installation du JDK (mot de passe administrateur demandé)…"
-        if sudo installer -pkg "$JAVA_PKG_FILE" -target / 2>/dev/null; then
-          rm -f "$JAVA_PKG_FILE"
-          export JAVA_HOME=$(/usr/libexec/java_home -v 25 2>/dev/null)
-          export PATH="$JAVA_HOME/bin:$PATH"
-          JAVA_OK=1
-          echo "         Java 25 installé."
-        else
-          rm -f "$JAVA_PKG_FILE"
-          echo "         Installation .pkg annulée ou échouée (pas de souci, on essaie sans mot de passe)."
-        fi
-      else
-        echo "         Téléchargement du .pkg échoué."
-      fi
-    fi
+    if [[ -z "$JAVA_PKG_URL" ]] && [[ -z "$JAVA_TGZ_URL" ]]; then
+      echo "         Impossible de récupérer les liens de téléchargement Java (réseau ?)."
+    else
+      echo ""
+      echo "  Comment voulez-vous installer Java 25 ?"
+      echo "    1) Sur le système (mot de passe admin demandé, Java partagé pour tout le Mac)"
+      echo "    2) Portable (inclus dans l’app CaveRenderPro uniquement, pas de mot de passe)"
+      echo ""
+      read -p "  Votre choix (1 ou 2) [2] : " JAVA_INSTALL_CHOICE
+      JAVA_INSTALL_CHOICE="${JAVA_INSTALL_CHOICE:-2}"
 
-    # Essai 2 : .tar.gz sans sudo (JDK sera inclus dans l’app CaveRenderPro)
-    if [[ $JAVA_OK -eq 0 ]] && [[ -n "$JAVA_TGZ_URL" ]]; then
-      echo "         Téléchargement de Java 25 en mode portable (sans mot de passe)…"
-      JAVA_TGZ_FILE="$INSTALL_DIR/temurin25.tar.gz"
-      if curl -L -o "$JAVA_TGZ_FILE" "$JAVA_TGZ_URL" && [[ -f "$JAVA_TGZ_FILE" ]]; then
-        echo "         Extraction du JDK…"
-        tar -xzf "$JAVA_TGZ_FILE" -C "$INSTALL_DIR" 2>/dev/null
-        rm -f "$JAVA_TGZ_FILE"
-        JDK_TOP=$(find "$INSTALL_DIR" -maxdepth 1 -type d -name "*.jdk" 2>/dev/null | head -1)
-        if [[ -n "$JDK_TOP" ]] && [[ -d "$JDK_TOP/Contents/Home" ]]; then
-          export JAVA_HOME="$JDK_TOP/Contents/Home"
-          export PATH="$JAVA_HOME/bin:$PATH"
-          BUNDLED_JDK_DIR="$JDK_TOP"
-          JAVA_OK=1
-          echo "         Java 25 prêt (inclus dans l’application, pas d’installation système)."
-        elif [[ -n "$JDK_TOP" ]] && [[ -x "$JDK_TOP/bin/java" ]]; then
-          export JAVA_HOME="$JDK_TOP"
-          export PATH="$JAVA_HOME/bin:$PATH"
-          BUNDLED_JDK_DIR="$JDK_TOP"
-          JAVA_OK=1
-          echo "         Java 25 prêt (inclus dans l’application)."
+      if [[ "$JAVA_INSTALL_CHOICE" == "1" ]] && [[ -n "$JAVA_PKG_URL" ]]; then
+        echo ""
+        echo "         Téléchargement de Java 25 (Temurin)…"
+        JAVA_PKG_FILE="$INSTALL_DIR/temurin25.pkg"
+        if curl -L -o "$JAVA_PKG_FILE" "$JAVA_PKG_URL" && [[ -f "$JAVA_PKG_FILE" ]]; then
+          echo "         Installation du JDK (mot de passe administrateur demandé)…"
+          if sudo installer -pkg "$JAVA_PKG_FILE" -target / 2>/dev/null; then
+            rm -f "$JAVA_PKG_FILE"
+            export JAVA_HOME=$(/usr/libexec/java_home -v 25 2>/dev/null)
+            [[ -z "$JAVA_HOME" ]] && export JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null)
+            export PATH="${JAVA_HOME}/bin:$PATH"
+            JAVA_OK=1
+            echo "         Java 25 installé sur le système."
+          else
+            rm -f "$JAVA_PKG_FILE"
+            echo "         Installation annulée ou échouée."
+          fi
         else
-          echo "         Structure du JDK extrait inattendue."
+          echo "         Téléchargement du .pkg échoué."
         fi
-      else
-        echo "         Échec du téléchargement du JDK."
+      fi
+
+      if [[ $JAVA_OK -eq 0 ]] && [[ -n "$JAVA_TGZ_URL" ]]; then
+        if [[ "$JAVA_INSTALL_CHOICE" != "1" ]]; then
+          echo ""
+        fi
+        echo "         Téléchargement de Java 25 en mode portable…"
+        JAVA_TGZ_FILE="$INSTALL_DIR/temurin25.tar.gz"
+        if curl -L -o "$JAVA_TGZ_FILE" "$JAVA_TGZ_URL" && [[ -f "$JAVA_TGZ_FILE" ]]; then
+          echo "         Extraction du JDK…"
+          tar -xzf "$JAVA_TGZ_FILE" -C "$INSTALL_DIR" 2>/dev/null
+          rm -f "$JAVA_TGZ_FILE"
+          JDK_TOP=$(find "$INSTALL_DIR" -maxdepth 1 -type d -name "*.jdk" 2>/dev/null | head -1)
+          if [[ -n "$JDK_TOP" ]] && [[ -d "$JDK_TOP/Contents/Home" ]]; then
+            export JAVA_HOME="$JDK_TOP/Contents/Home"
+            export PATH="$JAVA_HOME/bin:$PATH"
+            BUNDLED_JDK_DIR="$JDK_TOP"
+            JAVA_OK=1
+            echo "         Java 25 prêt (inclus dans l’application)."
+          elif [[ -n "$JDK_TOP" ]] && [[ -x "$JDK_TOP/bin/java" ]]; then
+            export JAVA_HOME="$JDK_TOP"
+            export PATH="$JAVA_HOME/bin:$PATH"
+            BUNDLED_JDK_DIR="$JDK_TOP"
+            JAVA_OK=1
+            echo "         Java 25 prêt (inclus dans l’application)."
+          else
+            echo "         Structure du JDK extrait inattendue."
+          fi
+        else
+          echo "         Échec du téléchargement du JDK."
+        fi
       fi
     fi
 
