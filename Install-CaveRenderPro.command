@@ -77,7 +77,7 @@ except Exception: pass
     if [[ $JAVA_OK -eq 0 ]] && [[ -n "$JAVA_PKG_URL" ]]; then
       echo "         Téléchargement de Java 25 (Temurin)…"
       JAVA_PKG_FILE="$INSTALL_DIR/temurin25.pkg"
-      if curl -sL -o "$JAVA_PKG_FILE" "$JAVA_PKG_URL" 2>/dev/null && [[ -f "$JAVA_PKG_FILE" ]]; then
+      if curl -L -o "$JAVA_PKG_FILE" "$JAVA_PKG_URL" && [[ -f "$JAVA_PKG_FILE" ]]; then
         echo "         Installation du JDK (mot de passe administrateur demandé)…"
         if sudo installer -pkg "$JAVA_PKG_FILE" -target / 2>/dev/null; then
           rm -f "$JAVA_PKG_FILE"
@@ -98,7 +98,7 @@ except Exception: pass
     if [[ $JAVA_OK -eq 0 ]] && [[ -n "$JAVA_TGZ_URL" ]]; then
       echo "         Téléchargement de Java 25 en mode portable (sans mot de passe)…"
       JAVA_TGZ_FILE="$INSTALL_DIR/temurin25.tar.gz"
-      if curl -sL -o "$JAVA_TGZ_FILE" "$JAVA_TGZ_URL" 2>/dev/null && [[ -f "$JAVA_TGZ_FILE" ]]; then
+      if curl -L -o "$JAVA_TGZ_FILE" "$JAVA_TGZ_URL" && [[ -f "$JAVA_TGZ_FILE" ]]; then
         echo "         Extraction du JDK…"
         tar -xzf "$JAVA_TGZ_FILE" -C "$INSTALL_DIR" 2>/dev/null
         rm -f "$JAVA_TGZ_FILE"
