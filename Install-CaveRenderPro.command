@@ -27,31 +27,32 @@ fi
 mkdir -p "$INSTALL_DIR"
 cd "$INSTALL_DIR"
 
-# ─── 1. Java ─────────────────────────────────────────
+# ─── 1. Java (CaveRenderPro nécessite Java 25) ───────
 echo "  [1/4] Vérification de Java…"
 JAVA_OK=0
 if command -v java &>/dev/null; then
   JAVA_VERSION=$(java -version 2>&1 | head -1)
-  if java -version 2>&1 | grep -qE "version \"(1[7-9]|[2-9][0-9])"; then
+  # Class file 69.0 = Java 25 ; on accepte 25 ou plus récent
+  if java -version 2>&1 | grep -qE "version \"(25|[3-9][0-9])"; then
     JAVA_OK=1
     echo "         Java trouvé : $JAVA_VERSION"
   fi
 fi
 
 if [[ $JAVA_OK -eq 0 ]]; then
-  echo "         Java 17 ou plus récent est requis."
+  echo "         CaveRenderPro nécessite Java 25 ou plus récent."
   if command -v brew &>/dev/null; then
-    echo "         Installation de Java 21 via Homebrew…"
-    brew install openjdk@21
-    export JAVA_HOME="$(brew --prefix openjdk@21)"
+    echo "         Installation de Java 25 via Homebrew (Temurin)…"
+    brew install --cask temurin@25
+    export JAVA_HOME=$(/usr/libexec/java_home -v 25 2>/dev/null)
     export PATH="$JAVA_HOME/bin:$PATH"
     JAVA_OK=1
-    echo "         Java installé."
+    echo "         Java 25 installé."
   else
     echo ""
-    echo "  ⚠️  Homebrew n’est pas installé. Installez Java manuellement :"
-    echo "     https://adoptium.net/temurin/releases/"
-    echo "     Choisissez « macOS » et « JDK 21 » pour votre Mac."
+    echo "  ⚠️  Homebrew n’est pas installé. Installez Java 25 manuellement :"
+    echo "     https://adoptium.net/temurin/releases/?version=25"
+    echo "     Choisissez « macOS » et « JDK 25 » pour votre Mac."
     echo ""
     read -p "  Appuyez sur Entrée pour quitter…"
     exit 1
@@ -135,14 +136,19 @@ mkdir -p "$(dirname "$LOG_FILE")"
 exec >> "$LOG_FILE" 2>&1
 echo "--- $(date) ---"
 
-# Trouver Java 21 en priorité (compatible JavaFX 23)
+# Trouver Java 25 en priorité (requis par CaveRenderPro, class version 69)
 if [[ -z "$JAVA_HOME" ]]; then
-  JAVA_HOME=$(/usr/libexec/java_home -v 21 2>/dev/null) || true
+  JAVA_HOME=$(/usr/libexec/java_home -v 25 2>/dev/null) || true
+fi
+if [[ -z "$JAVA_HOME" ]]; then
+  JAVA_HOME=$(/usr/libexec/java_home -v 24 2>/dev/null) || true
 fi
 if [[ -z "$JAVA_HOME" ]]; then
   JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null) || true
 fi
 if [[ -z "$JAVA_HOME" ]]; then
+  [[ -d "/opt/homebrew/opt/openjdk" ]] && JAVA_HOME="/opt/homebrew/opt/openjdk"
+  [[ -d "/usr/local/opt/openjdk" ]] && JAVA_HOME="/usr/local/opt/openjdk"
   [[ -d "/opt/homebrew/opt/openjdk@21" ]] && JAVA_HOME="/opt/homebrew/opt/openjdk@21"
   [[ -d "/usr/local/opt/openjdk@21" ]] && JAVA_HOME="/usr/local/opt/openjdk@21"
 fi
@@ -153,7 +159,13 @@ else
 fi
 
 if [[ ! -x "$JAVA_CMD" ]] && ! command -v java &>/dev/null; then
-  osascript -e "display alert \"CaveRenderPro\" message \"Java est introuvable. Installez Java 21 (adoptium.net) ou relancez le script d'installation.\" as critical"
+  osascript -e "display alert \"CaveRenderPro\" message \"Java est introuvable. Installez Java 25 (adoptium.net/temurin, version 25) ou relancez le script d'installation.\" as critical"
+  exit 1
+fi
+# CaveRenderPro nécessite Java 25 (class file 69)
+JAVA_VER=$("$JAVA_CMD" -version 2>&1 | grep -oE '"([0-9]+)' | head -1 | tr -d '"')
+if [[ -n "$JAVA_VER" ]] && [[ "$JAVA_VER" -lt 25 ]]; then
+  osascript -e "display alert \"CaveRenderPro\" message \"Java 25 ou plus récent est requis (vous avez Java $JAVA_VER). Installez Java 25 puis relancez le script d'installation.\" as critical"
   exit 1
 fi
 if [[ ! -f "$JAR" ]]; then
