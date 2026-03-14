@@ -12,6 +12,7 @@ echo ""
 
 # Répertoire de travail (dans le dossier Téléchargements pour être facile à trouver)
 INSTALL_DIR="${HOME}/Téléchargements/CaveRenderPro-install"
+INSTALL_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CRP_URL="https://www.caverender.de/CaveRenderPro/CaveRenderPro.zip"
 JAVAFX_BASE="https://download.java.net/java/GA/javafx23.0.2/512f2f157741485abda37a0a95f69984//3"
 APP_NAME="CaveRenderPro.app"
@@ -121,6 +122,31 @@ mkdir -p "$APP_ROOT/Contents/Resources"
 cp CaveRenderPro.jar "$APP_ROOT/Contents/Resources/"
 cp -R "$JAVAFX_DIR" "$APP_ROOT/Contents/Resources/"
 
+# Icône (favicon « C » du site caverender.de)
+ICONSET_DIR="$INSTALL_DIR/AppIcon.iconset"
+if [[ -f "$INSTALL_SCRIPT_DIR/CaveRenderPro.icns" ]]; then
+  cp "$INSTALL_SCRIPT_DIR/CaveRenderPro.icns" "$APP_ROOT/Contents/Resources/"
+elif [[ -f "$INSTALL_DIR/CaveRenderPro.icns" ]]; then
+  cp "$INSTALL_DIR/CaveRenderPro.icns" "$APP_ROOT/Contents/Resources/"
+else
+  echo "         Téléchargement de l’icône…"
+  curl -sL -o "$INSTALL_DIR/favicon.ico" "https://www.caverender.de/CaveRenderPro/favicon.ico"
+  if [[ -f "$INSTALL_DIR/favicon.ico" ]]; then
+    sips -s format png "$INSTALL_DIR/favicon.ico" --out "$INSTALL_DIR/favicon.png" 2>/dev/null
+    rm -rf "$ICONSET_DIR"
+    mkdir -p "$ICONSET_DIR"
+    for s in 16 32 128 256 512; do
+      sips -z $s $s "$INSTALL_DIR/favicon.png" --out "$ICONSET_DIR/icon_${s}x${s}.png" 2>/dev/null
+      d=$((s*2))
+      sips -z $d $d "$INSTALL_DIR/favicon.png" --out "$ICONSET_DIR/icon_${s}x${s}@2x.png" 2>/dev/null
+    done
+    if iconutil -c icns -o "$INSTALL_DIR/CaveRenderPro.icns" "$ICONSET_DIR" 2>/dev/null; then
+      cp "$INSTALL_DIR/CaveRenderPro.icns" "$APP_ROOT/Contents/Resources/"
+    fi
+    rm -rf "$ICONSET_DIR" "$INSTALL_DIR/favicon.ico" "$INSTALL_DIR/favicon.png"
+  fi
+fi
+
 # Script de lancement à l’intérieur du .app
 LAUNCHER="$APP_ROOT/Contents/MacOS/CaveRenderPro"
 cat > "$LAUNCHER" << 'LAUNCHER_SCRIPT'
@@ -211,6 +237,8 @@ cat > "$APP_ROOT/Contents/Info.plist" << 'PLIST'
   <string>APPL</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>CFBundleIconFile</key>
+  <string>CaveRenderPro</string>
 </dict>
 </plist>
 PLIST
