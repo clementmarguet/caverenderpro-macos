@@ -129,7 +129,16 @@ APP_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 RESOURCES="$APP_ROOT/Contents/Resources"
 JAR="$RESOURCES/CaveRenderPro.jar"
 JAVAFX_LIB="$RESOURCES/javafx-sdk-23.0.2/lib"
+LOG_FILE="$HOME/Library/Logs/CaveRenderPro.log"
 
+mkdir -p "$(dirname "$LOG_FILE")"
+exec >> "$LOG_FILE" 2>&1
+echo "--- $(date) ---"
+
+# Trouver Java 21 en priorité (compatible JavaFX 23)
+if [[ -z "$JAVA_HOME" ]]; then
+  JAVA_HOME=$(/usr/libexec/java_home -v 21 2>/dev/null) || true
+fi
 if [[ -z "$JAVA_HOME" ]]; then
   JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null) || true
 fi
@@ -142,13 +151,31 @@ if [[ -n "$JAVA_HOME" ]]; then
 else
   JAVA_CMD="java"
 fi
-"$JAVA_CMD" \
+
+if [[ ! -x "$JAVA_CMD" ]] && ! command -v java &>/dev/null; then
+  osascript -e "display alert \"CaveRenderPro\" message \"Java est introuvable. Installez Java 21 (adoptium.net) ou relancez le script d'installation.\" as critical"
+  exit 1
+fi
+if [[ ! -f "$JAR" ]]; then
+  osascript -e "display alert \"CaveRenderPro\" message \"Fichier introuvable: CaveRenderPro.jar\" as critical"
+  exit 1
+fi
+if [[ ! -d "$JAVAFX_LIB" ]]; then
+  osascript -e "display alert \"CaveRenderPro\" message \"JavaFX introuvable dans l'application. Relancez le script d'installation.\" as critical"
+  exit 1
+fi
+
+cd "$RESOURCES"
+if ! "$JAVA_CMD" \
   -Dprism.order=sw \
   -Dprism.text=t2k \
   -Djavafx.macosx.embedded=true \
   --module-path "$JAVAFX_LIB" \
   --add-modules javafx.controls,javafx.fxml,javafx.web \
-  -jar "$JAR"
+  -jar "$JAR"; then
+  osascript -e "display alert \"CaveRenderPro a quitté avec une erreur\" message \"Consultez le fichier:\n$LOG_FILE\" as critical"
+  exit 1
+fi
 LAUNCHER_SCRIPT
 chmod +x "$LAUNCHER"
 

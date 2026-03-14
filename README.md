@@ -7,18 +7,17 @@ Script d’installation pour faire tourner [CaveRenderPro](https://www.caverende
 Ouvrez **Terminal** et collez :
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/VOTRE_USERNAME/VOTRE_REPO/main/install/Install-CaveRenderPro.command" -o /tmp/Install-CaveRenderPro.command && chmod +x /tmp/Install-CaveRenderPro.command && /tmp/Install-CaveRenderPro.command
+curl -fsSL "https://raw.githubusercontent.com/clementmarguet/caverenderpro-macos/main/Install-CaveRenderPro.command" | sed 's/\r$//' > /tmp/Install-CaveRenderPro.command && chmod +x /tmp/Install-CaveRenderPro.command && /tmp/Install-CaveRenderPro.command
 ```
 
-Remplacez `VOTRE_USERNAME` et `VOTRE_REPO` par votre compte et le nom du dépôt GitHub (par ex. `votrepseudo/CaveRenderPro-prj` → `votrepseudo` et `CaveRenderPro-prj`).
 
 ## Installation manuelle
 
 1. Cloner ou télécharger ce dépôt.
-2. Double-cliquer sur `install/Install-CaveRenderPro.command`.
+2. Double-cliquer sur `Install-CaveRenderPro.command`.
 3. Si macOS bloque l’exécution : **Préférences Système > Sécurité et confidentialité** → « Ouvrir quand même ».
 
-Voir aussi `install/LISEZMOI.txt` pour le détail des étapes.
+Voir aussi `LISEZMOI.txt` pour le détail des étapes.
 
 ## Prérequis
 
