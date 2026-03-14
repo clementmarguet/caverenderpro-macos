@@ -1,0 +1,5 @@
+# Toujours enregistrer les scripts avec des fins de ligne LF (Unix)
+# pour éviter « env: bash\r: No such file or directory » sur macOS
+*.command text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
