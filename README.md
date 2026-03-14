@@ -23,7 +23,7 @@ Voir aussi `LISEZMOI.txt` pour le détail des étapes.
 
 - macOS (Apple Silicon ou Intel)
 - Connexion Internet
-- Optionnel : [Homebrew](https://brew.sh) pour installer Java automatiquement ; sinon, installer [Java 25](https://adoptium.net/temurin/releases/?version=25) à la main puis relancer le script
+- **Java 25** : le script peut l’installer automatiquement — avec [Homebrew](https://brew.sh) ou **sans** (téléchargement direct du JDK Temurin + installation en ligne de commande). Si l’installation échoue, installez [Java 25](https://adoptium.net/temurin/releases/?version=25) à la main puis relancez le script.
 
 ## Licence
 

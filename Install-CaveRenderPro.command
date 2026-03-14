@@ -50,13 +50,50 @@ if [[ $JAVA_OK -eq 0 ]]; then
     JAVA_OK=1
     echo "         Java 25 installé."
   else
-    echo ""
-    echo "  ⚠️  Homebrew n’est pas installé. Installez Java 25 manuellement :"
-    echo "     https://adoptium.net/temurin/releases/?version=25"
-    echo "     Choisissez « macOS » et « JDK 25 » pour votre Mac."
-    echo ""
-    read -p "  Appuyez sur Entrée pour quitter…"
-    exit 1
+    # Sans Homebrew : téléchargement direct du .pkg Temurin via l’API Adoptium
+    ADOPTIUM_ARCH="x64"
+    [[ "$ARCH" == "arm64" ]] && ADOPTIUM_ARCH="aarch64"
+    echo "         Téléchargement de Java 25 (Temurin) sans Homebrew…"
+    JAVA_PKG_URL=$(curl -sL "https://api.adoptium.net/v3/assets/feature_releases/25/ga?os=mac&architecture=$ADOPTIUM_ARCH&image_type=jdk" 2>/dev/null | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    if data and data[0].get('binaries') and data[0]['binaries'][0].get('installer', {}).get('link'):
+        print(data[0]['binaries'][0]['installer']['link'])
+except Exception: pass
+" 2>/dev/null)
+    if [[ -n "$JAVA_PKG_URL" ]]; then
+      JAVA_PKG_FILE="$INSTALL_DIR/temurin25.pkg"
+      if curl -sL -o "$JAVA_PKG_FILE" "$JAVA_PKG_URL" 2>/dev/null && [[ -f "$JAVA_PKG_FILE" ]]; then
+        echo "         Installation du JDK (mot de passe administrateur demandé)…"
+        if sudo installer -pkg "$JAVA_PKG_FILE" -target / 2>/dev/null; then
+          rm -f "$JAVA_PKG_FILE"
+          export JAVA_HOME=$(/usr/libexec/java_home -v 25 2>/dev/null)
+          export PATH="$JAVA_HOME/bin:$PATH"
+          JAVA_OK=1
+          echo "         Java 25 installé."
+        else
+          rm -f "$JAVA_PKG_FILE"
+          echo "         Installation annulée ou échouée."
+        fi
+      else
+        echo "         Échec du téléchargement."
+      fi
+    fi
+    if [[ $JAVA_OK -eq 0 ]]; then
+      echo ""
+      echo "  ⚠️  Java 25 n’a pas pu être installé automatiquement."
+      echo "     Installez-le à la main puis relancez ce script :"
+      echo "     https://adoptium.net/temurin/releases/?version=25"
+      echo ""
+      read -p "  Ouvrir la page dans le navigateur ? (o/n) " -n 1 OPEN_BROWSER
+      echo ""
+      if [[ "$OPEN_BROWSER" =~ [oOyY] ]]; then
+        open "https://adoptium.net/temurin/releases/?version=25&os=macos" 2>/dev/null || true
+      fi
+      read -p "  Appuyez sur Entrée pour quitter…"
+      exit 1
+    fi
   fi
 fi
 
