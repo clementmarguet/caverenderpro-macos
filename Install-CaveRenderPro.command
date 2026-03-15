@@ -41,116 +41,35 @@ if command -v java &>/dev/null; then
 fi
 
 if [[ $JAVA_OK -eq 0 ]]; then
-  echo "         CaveRenderPro nécessite Java 25 ou plus récent."
+  echo "         CaveRenderPro nécessite Java 25. On passe par Homebrew."
+  if ! command -v brew &>/dev/null; then
+    echo ""
+    echo "  Homebrew n’est pas installé. Installation (mot de passe admin demandé)…"
+    echo "  Voir https://brew.sh"
+    echo ""
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Ajouter brew au PATH pour cette session (Apple Silicon ou Intel)
+    if [[ -x /opt/homebrew/bin/brew ]]; then
+      eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -x /usr/local/bin/brew ]]; then
+      eval "$(/usr/local/bin/brew shellenv)"
+    fi
+  fi
   if command -v brew &>/dev/null; then
     echo "         Installation de Java 25 via Homebrew (Temurin)…"
     brew install --cask temurin@25
     export JAVA_HOME=$(/usr/libexec/java_home -v 25 2>/dev/null)
-    export PATH="$JAVA_HOME/bin:$PATH"
+    [[ -z "$JAVA_HOME" ]] && export JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null)
+    export PATH="${JAVA_HOME}/bin:$PATH"
     JAVA_OK=1
     echo "         Java 25 installé."
   else
-    # Sans Homebrew : on demande à l’utilisateur (install système ou portable)
-    ADOPTIUM_ARCH="x64"
-    [[ "$ARCH" == "arm64" ]] && ADOPTIUM_ARCH="aarch64"
-    ADOPTIUM_API="https://api.adoptium.net/v3/assets/feature_releases/25/ga?os=mac&architecture=$ADOPTIUM_ARCH&image_type=jdk"
-    ADOPTIUM_JSON=$(curl -sL "$ADOPTIUM_API" 2>/dev/null)
-    JAVA_PKG_URL=$(echo "$ADOPTIUM_JSON" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    if data and data[0].get('binaries') and data[0]['binaries'][0].get('installer', {}).get('link'):
-        print(data[0]['binaries'][0]['installer']['link'])
-except Exception: pass
-" 2>/dev/null)
-    JAVA_TGZ_URL=$(echo "$ADOPTIUM_JSON" | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    if data and data[0].get('binaries') and data[0]['binaries'][0].get('package', {}).get('link'):
-        print(data[0]['binaries'][0]['package']['link'])
-except Exception: pass
-" 2>/dev/null)
-
-    if [[ -z "$JAVA_PKG_URL" ]] && [[ -z "$JAVA_TGZ_URL" ]]; then
-      echo "         Impossible de récupérer les liens de téléchargement Java (réseau ?)."
-    else
-      echo ""
-      echo "  Comment voulez-vous installer Java 25 ?"
-      echo "    1) Sur le système (mot de passe admin demandé, Java partagé pour tout le Mac)"
-      echo "    2) Portable (inclus dans l’app CaveRenderPro uniquement, pas de mot de passe)"
-      echo ""
-      read -p "  Votre choix (1 ou 2) [2] : " JAVA_INSTALL_CHOICE
-      JAVA_INSTALL_CHOICE="${JAVA_INSTALL_CHOICE:-2}"
-
-      if [[ "$JAVA_INSTALL_CHOICE" == "1" ]] && [[ -n "$JAVA_PKG_URL" ]]; then
-        echo ""
-        echo "         Téléchargement de Java 25 (Temurin)…"
-        JAVA_PKG_FILE="$INSTALL_DIR/temurin25.pkg"
-        if curl -L -o "$JAVA_PKG_FILE" "$JAVA_PKG_URL" && [[ -f "$JAVA_PKG_FILE" ]]; then
-          echo "         Installation du JDK (mot de passe administrateur demandé)…"
-          if sudo installer -pkg "$JAVA_PKG_FILE" -target / 2>/dev/null; then
-            rm -f "$JAVA_PKG_FILE"
-            export JAVA_HOME=$(/usr/libexec/java_home -v 25 2>/dev/null)
-            [[ -z "$JAVA_HOME" ]] && export JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null)
-            export PATH="${JAVA_HOME}/bin:$PATH"
-            JAVA_OK=1
-            echo "         Java 25 installé sur le système."
-          else
-            rm -f "$JAVA_PKG_FILE"
-            echo "         Installation annulée ou échouée."
-          fi
-        else
-          echo "         Téléchargement du .pkg échoué."
-        fi
-      fi
-
-      if [[ $JAVA_OK -eq 0 ]] && [[ -n "$JAVA_TGZ_URL" ]]; then
-        if [[ "$JAVA_INSTALL_CHOICE" != "1" ]]; then
-          echo ""
-        fi
-        echo "         Téléchargement de Java 25 en mode portable…"
-        JAVA_TGZ_FILE="$INSTALL_DIR/temurin25.tar.gz"
-        if curl -L -o "$JAVA_TGZ_FILE" "$JAVA_TGZ_URL" && [[ -f "$JAVA_TGZ_FILE" ]]; then
-          echo "         Extraction du JDK…"
-          tar -xzf "$JAVA_TGZ_FILE" -C "$INSTALL_DIR" 2>/dev/null
-          rm -f "$JAVA_TGZ_FILE"
-          JDK_TOP=$(find "$INSTALL_DIR" -maxdepth 1 -type d -name "*.jdk" 2>/dev/null | head -1)
-          if [[ -n "$JDK_TOP" ]] && [[ -d "$JDK_TOP/Contents/Home" ]]; then
-            export JAVA_HOME="$JDK_TOP/Contents/Home"
-            export PATH="$JAVA_HOME/bin:$PATH"
-            BUNDLED_JDK_DIR="$JDK_TOP"
-            JAVA_OK=1
-            echo "         Java 25 prêt (inclus dans l’application)."
-          elif [[ -n "$JDK_TOP" ]] && [[ -x "$JDK_TOP/bin/java" ]]; then
-            export JAVA_HOME="$JDK_TOP"
-            export PATH="$JAVA_HOME/bin:$PATH"
-            BUNDLED_JDK_DIR="$JDK_TOP"
-            JAVA_OK=1
-            echo "         Java 25 prêt (inclus dans l’application)."
-          else
-            echo "         Structure du JDK extrait inattendue."
-          fi
-        else
-          echo "         Échec du téléchargement du JDK."
-        fi
-      fi
-    fi
-
-    if [[ $JAVA_OK -eq 0 ]]; then
-      echo ""
-      echo "  ⚠️  Java 25 n’a pas pu être installé (réseau ou droits insuffisants)."
-      echo "     Installez-le à la main puis relancez ce script :"
-      echo "     https://adoptium.net/temurin/releases/?version=25"
-      echo ""
-      read -p "  Ouvrir la page dans le navigateur ? (o/n) " -n 1 OPEN_BROWSER
-      echo ""
-      if [[ "$OPEN_BROWSER" =~ [oOyY] ]]; then
-        open "https://adoptium.net/temurin/releases/?version=25&os=macos" 2>/dev/null || true
-      fi
-      read -p "  Appuyez sur Entrée pour quitter…"
-      exit 1
-    fi
+    echo ""
+    echo "  ⚠️  Homebrew n’a pas pu être installé ou n’est pas dans le PATH."
+    echo "     Installez-le manuellement : https://brew.sh"
+    echo "     Puis relancez ce script."
+    read -p "  Appuyez sur Entrée pour quitter…"
+    exit 1
   fi
 fi
 
@@ -215,11 +134,6 @@ mkdir -p "$APP_ROOT/Contents/Resources"
 # Copier JAR et JavaFX dans l’app
 cp CaveRenderPro.jar "$APP_ROOT/Contents/Resources/"
 cp -R "$JAVAFX_DIR" "$APP_ROOT/Contents/Resources/"
-# Si on a un JDK portable (sans sudo), l’inclure dans l’app pour qu’elle soit autonome
-if [[ -n "$BUNDLED_JDK_DIR" ]] && [[ -d "$BUNDLED_JDK_DIR" ]]; then
-  rm -rf "$APP_ROOT/Contents/Resources/jdk"
-  cp -R "$BUNDLED_JDK_DIR" "$APP_ROOT/Contents/Resources/jdk"
-fi
 
 # Icône (favicon « C » du site caverender.de)
 ICONSET_DIR="$INSTALL_DIR/AppIcon.iconset"
@@ -261,7 +175,7 @@ mkdir -p "$(dirname "$LOG_FILE")"
 exec >> "$LOG_FILE" 2>&1
 echo "--- $(date) ---"
 
-# Trouver Java 25+ uniquement (on ignore les anciennes versions comme Java 14)
+# Trouver Java 25+ (installé via Homebrew ou système)
 check_java_25() {
   local jhome="$1"
   [[ -z "$jhome" ]] && return 1
@@ -271,19 +185,12 @@ check_java_25() {
   return 1
 }
 JAVA_HOME=""
-if check_java_25 "$RESOURCES/jdk/Contents/Home"; then
-  JAVA_HOME="$RESOURCES/jdk/Contents/Home"
-elif check_java_25 "$RESOURCES/jdk"; then
-  JAVA_HOME="$RESOURCES/jdk"
-fi
+for j in "$(/usr/libexec/java_home -v 25 2>/dev/null)" "$(/usr/libexec/java_home -v 24 2>/dev/null)" "$(/usr/libexec/java_home 2>/dev/null)"; do
+  [[ -z "$j" ]] && continue
+  if check_java_25 "$j"; then JAVA_HOME="$j"; break; fi
+done
 if [[ -z "$JAVA_HOME" ]]; then
-  for j in "$(/usr/libexec/java_home -v 25 2>/dev/null)" "$(/usr/libexec/java_home -v 24 2>/dev/null)" "$(/usr/libexec/java_home 2>/dev/null)"; do
-    [[ -z "$j" ]] && continue
-    if check_java_25 "$j"; then JAVA_HOME="$j"; break; fi
-  done
-fi
-if [[ -z "$JAVA_HOME" ]]; then
-  for j in /opt/homebrew/opt/openjdk /usr/local/opt/openjdk /opt/homebrew/opt/openjdk@21 /usr/local/opt/openjdk@21; do
+  for j in /opt/homebrew/opt/openjdk /usr/local/opt/openjdk /opt/homebrew/opt/temurin@25 /usr/local/opt/temurin@25; do
     [[ -d "$j" ]] && check_java_25 "$j" && JAVA_HOME="$j" && break
   done
 fi
